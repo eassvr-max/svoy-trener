@@ -271,6 +271,8 @@
     for (const side of ['L', 'R']) {
       const S = SIDES[side];
       f.arm[side] = { elbow: elbowArm(S), w: sideW(S, side, ['sh', 'el', 'wr']),
+        // плечевая кость от вертикали (0 — висит вдоль корпуса): для бицепса «локоть уходит вперёд»
+        upper: blend(lineFromVertical(flat(sub(im[S.el], im[S.sh]))), w ? lineFromVertical(sub(w[S.el], w[S.sh])) : null),
         len2: [norm(flat(sub(im[S.sh], im[S.el]))), norm(flat(sub(im[S.el], im[S.wr])))],
         len3: w ? [norm(sub(w[S.sh], w[S.el])), norm(sub(w[S.el], w[S.wr]))] : null };
     }
@@ -355,6 +357,9 @@
     const a = st.arms.pick(f.arm.L.elbow, f.arm.R.elbow, f.arm.L.w, f.arm.R.w, aL, aR);
     f.elbow = a.val; f.armSide = a.side; f.elbowFlex = 180 - a.val;
     f.armBad = st.refArm ? Math.min(aL, aR) > 0.55 : false;
+    const okL = !(st.refArm && aL > 0.55), okR = !(st.refArm && aR > 0.55);
+    const fl = okL ? 180 - f.arm.L.elbow : -1, fr = okR ? 180 - f.arm.R.elbow : -1;
+    f.curlSide = fl >= fr ? 'L' : 'R'; f.curlFlex = Math.max(fl, fr, 0);
     return f;
   }
   // типичные длины костей: 75-й перцентиль по обеим сторонам (сбои модели обычно укорачивают кость)
@@ -446,6 +451,34 @@
 
   // ---------------- каталог ошибок и речь тренера ----------------
   const FAULTS = {
+    cu_peak_major: { ex: 'curl', title: 'Гантель не доходит до плеча', severity: 'major', group: 'peak',
+      cues: ['Выше, до плеча', 'Дожми до конца', 'Полностью согни руку'],
+      tip: 'Поднимайте гантель, пока предплечье почти не коснётся плеча, и на секунду напрягите бицепс наверху.',
+      drill: 'Возьмите гантель на 1–2 кг легче и делайте 3×10 с паузой 1 с в верхней точке.' },
+    cu_peak: { ex: 'curl', title: 'Чуть не дожимаете наверху', severity: 'minor', group: 'peak',
+      cues: ['Чуть выше', 'Дожми'],
+      tip: 'Не хватает немного: доведите гантель до плеча и задержитесь на мгновение.',
+      drill: 'Пауза 1 с наверху в каждом повторе — 3×8.' },
+    cu_extend: { ex: 'curl', title: 'Рука не разгибается внизу', severity: 'minor', group: 'extend',
+      cues: ['Разгибай руку до конца', 'Опускай полностью'],
+      tip: 'Внизу выпрямляйте руку почти полностью — иначе бицепс работает только в половине движения.',
+      drill: 'Медленное опускание за 3 с до прямой руки — 3×8.' },
+    cu_elbow: { ex: 'curl', title: 'Локоть уходит вперёд — работает плечо', severity: 'major', group: 'elbow',
+      cues: ['Локоть к корпусу', 'Прижми локти', 'Плечо не двигается'],
+      tip: 'Плечо неподвижно, локоть прижат к боку — двигается только предплечье. Если не получается — гантель тяжеловата.',
+      drill: 'Подъёмы спиной к стене (лопатки и локти касаются стены) — 3×10.' },
+    cu_elbow_minor: { ex: 'curl', title: 'Локоть немного гуляет', severity: 'minor', group: 'elbow',
+      cues: ['Локоть на месте', 'Держи локоть'],
+      tip: 'Держите локоть у корпуса на всём движении.',
+      drill: 'Подъёмы сидя, локоть упирается в бедро (концентрированные) — 3×10.' },
+    cu_swing: { ex: 'curl', title: 'Раскачка корпусом — помогаете спиной', severity: 'major', group: 'swing',
+      cues: ['Не раскачивайся', 'Корпус неподвижно', 'Без рывка спиной'],
+      tip: 'Корпус стоит ровно, пресс напряжён; если без раскачки не поднять — возьмите гантели полегче.',
+      drill: 'Подъёмы стоя спиной к стене или сидя на скамье со спинкой — 3×10.' },
+    cu_fast: { ex: 'curl', title: 'Слишком быстро опускаете', severity: 'minor', group: 'tempo',
+      cues: ['Опускай медленнее', 'Подконтрольно вниз'],
+      tip: 'Опускайте гантель за 2 секунды — так мышца работает и на опускании.',
+      drill: 'Темп 1–0–3: вверх за 1 с, вниз за 3 с — 3×8.' },
     sq_depth_major: { ex: 'squat', title: 'Полуприсед — не хватает глубины', severity: 'major', group: 'depth',
       cues: ['Глубже', 'Ниже, до параллели', 'Ещё ниже'],
       tip: 'Опускайтесь, пока бедро не станет параллельно полу (таз на уровне коленей).',
@@ -586,6 +619,7 @@
       lockout: 'Полное выпрямление рук', head: 'Голова в нейтральном положении', tempo: 'Подконтрольный темп' },
     lunge: { knee: 'Голень передней ноги вертикальна — колено не уходит за носок', depth: 'Хорошая глубина выпада', trunk: 'Корпус держите вертикально', knees: 'Колено идёт по линии носка', tempo: 'Подконтрольный темп' },
     plank: { line: 'Ровная линия тела', head: 'Нейтральное положение головы', shoulders: 'Плечи над локтями' },
+    curl: { peak: 'Полная амплитуда наверху', extend: 'Полное разгибание внизу', elbow: 'Локоть прижат к корпусу', swing: 'Корпус неподвижен — без читинга', tempo: 'Подконтрольное опускание' },
   };
 
   const pick = (arr, rnd = Math.random) => arr[Math.floor(rnd() * arr.length) % arr.length];
@@ -620,6 +654,10 @@
     // на прямых руках спереди 3D-линия у правильных планок смещена «вверх» (медиана −0,09 по 122 клипам QEVD)
     frontStraight: { sag: 0.08, pike: -0.3, head: 0.85, shoulders: false }, // плечо над локтем спереди не видно; голова — по 1300 клипам QEVD
   };
+
+  // Бицепс с гантелями. Плечо и пик — правила автора Exercise-Correction (40° и 60°);
+  // раскачка корпусом — по его разметке «отклон назад»: у правильных повторов корпус в пределах ±3°, у ошибочных 8–21°.
+  const CU_T = { peakMinor: 60, peakMajor: 80, extend: 145, upperMinor: 30, upperMajor: 40, swing: 12, fastEcc: 0.6 };
 
   // ---------------- оценка повтора ----------------
   const crit = (code, status, value, label) => ({ code, status, value, label });
@@ -795,6 +833,40 @@
     return { criteria: C, ecc, con, depthValue: minElbow, depthText: txt };
   }
 
+  function evalCurl(F, rep) {
+    const R = F.slice(rep.s, rep.e + 1).filter((f) => f.ok);
+    const P = F[rep.p], side = P.curlSide || 'L', C = [];
+    const el = (f) => f.arm[side].elbow;
+    // 1. Пик: насколько согнут локоть наверху
+    const top = minOf(R.map(el));
+    const peakTxt = `наверху локоть ${Math.round(top)}°`;
+    if (top > CU_T.peakMajor) C.push(crit('cu_peak_major', 'major', Math.round(top), peakTxt));
+    else if (top > CU_T.peakMinor) C.push(crit('cu_peak', 'minor', Math.round(top), peakTxt));
+    else C.push(crit('peak', 'ok', Math.round(top), peakTxt));
+    // 2. Полное разгибание внизу (полуамплитуда)
+    const tf = topFrames(F, rep).filter((f) => f.ok);
+    const bottom = Math.max(maxOf(tf.map(el)), el(F[rep.s]), el(F[rep.e]));
+    if (bottom < CU_T.extend) C.push(crit('cu_extend', 'minor', Math.round(bottom), `внизу локоть ${Math.round(bottom)}° — рука не разгибается`));
+    else C.push(crit('extend', 'ok', Math.round(bottom), 'рука разгибается полностью'));
+    // 3. Плечо гуляет: насколько плечевая кость уходит от вертикали, пока рука согнута
+    const peakFlex = 180 - top;
+    const up = maxOf(R.filter((f) => 180 - el(f) > 0.5 * peakFlex).map((f) => f.arm[side].upper));
+    const upTxt = `плечо отходит от корпуса на ${Math.round(up)}°`;
+    if (up > CU_T.upperMajor) C.push(crit('cu_elbow', 'major', Math.round(up), upTxt));
+    else if (up > CU_T.upperMinor) C.push(crit('cu_elbow_minor', 'minor', Math.round(up), upTxt));
+    else C.push(crit('elbow', 'ok', Math.round(up), 'локоть прижат к корпусу'));
+    // 4. Раскачка корпусом: размах наклона за повтор
+    const leans = [...tf, ...R].map((f) => f.lean);
+    const sw = maxOf(leans) - minOf(leans);
+    if (sw > CU_T.swing) C.push(crit('cu_swing', 'major', Math.round(sw), `корпус качается на ${Math.round(sw)}°`));
+    else C.push(crit('swing', 'ok', Math.round(sw), 'корпус неподвижен'));
+    // 5. Темп опускания
+    const con = P.t - F[rep.s].t, ecc = F[rep.e].t - P.t;
+    if (ecc < CU_T.fastEcc) C.push(crit('cu_fast', 'minor', +ecc.toFixed(2), `опускание за ${ecc.toFixed(1)} с`));
+    else C.push(crit('tempo', 'ok', +ecc.toFixed(2), `вверх ${con.toFixed(1)} с, вниз ${ecc.toFixed(1)} с`));
+    return { criteria: C, ecc, con, depthValue: top, depthText: peakTxt, leg: side };
+  }
+
   function evalLunge(F, rep) {
     const R = F.slice(rep.s, rep.e + 1).filter((f) => f.ok);
     const C = [];
@@ -851,6 +923,8 @@
     lunge: { sig: 'hipDrop', minProm: 10, met: 5.0, eval: evalLunge,
       valid: (f) => f.ok && f.inFrame.legs && f.inFrame.torso && !f.legBad },
     plank: { met: 3.8, valid: (f) => f.ok && f.inFrame.torso && f.bodyTilt < 35 && f.support },
+    curl: { sig: 'curlFlex', minProm: 45, met: 3.5, eval: evalCurl, weighted: true,
+      valid: (f) => f.ok && f.inFrame.arms && f.inFrame.torso && f.bodyTilt > 50 },
   };
 
   // ---------------- анализ записанного подхода ----------------
@@ -933,6 +1007,12 @@
     // честные ограничения ракурса — по результатам проверки на 26 реальных людях
     const viewsUsed = reps.map((r) => r.view);
     const share = (v) => viewsUsed.filter((x) => x === v).length / (viewsUsed.length || 1);
+    if (exercise === 'curl' && share('front') >= 0.5)
+      notes.push('Камера стояла спереди: раскачку корпусом и уход локтя вперёд лучше видно сбоку. Для точной проверки повернитесь к камере боком.');
+    if (exercise === 'curl' && n >= 4) {
+      const L = reps.filter((r) => r.leg === 'L').length, Rr = reps.filter((r) => r.leg === 'R').length;
+      if (L && Rr && Math.abs(L - Rr) >= 3) notes.push(`Левой рукой ${L}, правой ${Rr} — выровняйте количество повторов на обе руки.`);
+    }
     if (exercise === 'pushup' && share('front') >= 0.5)
       notes.push('Отжимания сняты спереди — с этого ракурса не видно линию тела и плохо видна глубина. Для точной оценки поставьте телефон сбоку.');
     if (exercise === 'squat' && share('angle') >= 0.5)
@@ -1021,6 +1101,7 @@
       pushup: ['Отличное отжимание!', 'Вот это амплитуда!'],
       lunge: ['Отличный выпад!', 'Ровно и глубоко — супер!'],
       plank: ['Держишь отлично!', 'Ровная линия — супер!'],
+      curl: ['Чистый подъём!', 'Вот это бицепс!', 'Локоть на месте — отлично!'],
     },
     better: ['Вот, уже лучше!', 'Да, вот так!', 'Исправлено — отлично!', 'Уже лучше, продолжай!'],
     filler: ['Хорошо работаешь!', 'Отличный темп!', 'Так держать, продолжаем!', 'Дыши ровно.', 'Молодец, не сбавляй!', 'Всё получается!'],
@@ -1042,6 +1123,9 @@
       knee: { lunge: ['Опускайся вниз, а не вперёд — колено над пяткой.'] },
       line: { pushup: ['Тело как доска — напряги пресс и ягодицы.'], plank: ['Подкрути таз, тело — ровная доска.'] },
       heels: { squat: ['Перенеси вес на пятки, пальцы можно даже приподнять.'] },
+      elbow: { curl: ['Представь, что локти приклеены к бокам.', 'Двигается только предплечье, плечо неподвижно.'] },
+      swing: { curl: ['Напряги пресс и ягодицы — корпус как столб.', 'Тяжело без рывка — возьми гантели полегче.'] },
+      peak: { curl: ['Доводи гантель до плеча и сожми бицепс.'] },
     },
     nudgePraise: ['Хорошо', 'Отлично', 'Неплохо'],
     nudge: { // мягкая подсказка к похвале: «Хорошо, а теперь …»
@@ -1050,6 +1134,7 @@
       sq_fast: 'и чуть медленнее вниз', pu_fast: 'и медленнее вниз', lu_fast: 'и помедленнее', lu_trunk: 'и корпус повыше',
       sq_valgus_minor: 'и колени чуть наружу', lu_wide: 'и шаг чуть короче', pu_flare: 'и локти ближе к корпусу', pu_head: 'и голову ровно',
       sq_shift: 'и вес на обе ноги', sq_stance_narrow: 'и ноги чуть шире',
+      cu_peak: 'и чуть выше наверху', cu_extend: 'и разгибай руку до конца', cu_elbow_minor: 'и локоть держи на месте', cu_fast: 'и медленнее вниз',
     },
   };
 
@@ -1063,6 +1148,7 @@
     pushup: { target: 8, sets: 3, rest: 60, step: 2, min: 4, max: 40 },
     lunge: { target: 12, sets: 3, rest: 60, step: 2, min: 6, max: 40 },
     plank: { target: 30, sets: 3, rest: 45, step: 10, min: 15, max: 180 },
+    curl: { target: 10, sets: 3, rest: 75, step: 2, min: 6, max: 20, weighted: true, top: 14 },
   };
   // Прогрессия как у живого тренера: всё сделано и чисто — добавляем; не справился или техника развалилась — снижаем.
   function nextPlan(ex, last) {
@@ -1072,8 +1158,12 @@
     const done = last.sets.filter((x) => x.done >= last.target).length;
     const q = last.goodPct ?? 100;
     const unitTxt = (n) => plan.unit === 'sec' ? `${n} ${secWord(n)}` : `${n} ${repsWord(n)}`;
-    if (done >= plan.sets && q >= 80) { plan.target = Math.min(b.max, last.target + b.step); plan.why = `В прошлый раз все подходы сделаны чисто — добавляю ${unitTxt(b.step)}.`; }
-    else if (done === 0 || q < 50) { plan.target = Math.max(b.min, last.target - b.step); plan.why = q < 50 ? 'В прошлый раз техника страдала — делаем меньше, но чище.' : 'В прошлый раз было тяжеловато — немного снижаю.'; }
+    if (b.weighted) plan.kg = last.kg;
+    if (done >= plan.sets && q >= 80 && b.weighted && last.target >= b.top) {
+      plan.target = b.target; plan.kg = last.kg ? +(last.kg + (last.kg < 10 ? 1 : 2)).toFixed(1) : undefined;
+      plan.why = `${last.target} повторений чисто во всех подходах — пора тяжелее: ${plan.kg ? `гантели ${plan.kg} кг` : 'возьмите гантели на 1–2 кг тяжелее'}, снова ${b.target} повторений.`;
+    } else if (done >= plan.sets && q >= 80) { plan.target = Math.min(b.max, last.target + b.step); plan.why = `В прошлый раз все подходы сделаны чисто — добавляю ${unitTxt(b.step)}.`; }
+    else if (done === 0 || q < 50) { plan.target = Math.max(b.min, last.target - b.step); plan.why = q < 50 ? (b.weighted ? 'В прошлый раз техника страдала — возможно, вес великоват: сделайте меньше повторов или возьмите гантели полегче.' : 'В прошлый раз техника страдала — делаем меньше, но чище.') : 'В прошлый раз было тяжеловато — немного снижаю.'; }
     else { plan.target = last.target; plan.why = done < plan.sets ? 'Закрепим прошлый объём — цель сделать все подходы целиком.' : 'Закрепим прошлый объём — цель сделать все повторы чисто.'; }
     return plan;
   }
@@ -1375,7 +1465,7 @@
     finish(weightKg) { return analyze(this.raw, this.ex, { weightKg }); }
   }
 
-  const api = { nextPlan, PLAN_BASE, plural, repsWord, secWord, SETV, PL_T, spokenSummary, allPhrases, CoachVoice, VOICE, LU_T, SQ_T, PU_T, viewOf, I, SIDES, FAULTS, EXERCISES, makeFrame, pickPerson, PersonTracker, smoothOffline, features, segmentReps, analyze, LiveSession, OneEuro, yawOf };
+  const api = { CU_T, nextPlan, PLAN_BASE, plural, repsWord, secWord, SETV, PL_T, spokenSummary, allPhrases, CoachVoice, VOICE, LU_T, SQ_T, PU_T, viewOf, I, SIDES, FAULTS, EXERCISES, makeFrame, pickPerson, PersonTracker, smoothOffline, features, segmentReps, analyze, LiveSession, OneEuro, yawOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TrainerEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);

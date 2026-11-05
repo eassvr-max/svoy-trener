@@ -147,6 +147,18 @@ function render(P, yaw, { aspect = 16 / 9, r, scale = 0.45, cx = 0.5, floorY = 0
   return { lm, wl };
 }
 
+// подъём гантелей на бицепс: flex — сгиб локтя (0 — рука прямая), upper — плечо уходит вперёд, lean — наклон корпуса (<0 — назад)
+function curlPose({ flexL = 0, flexR = 0, upper = 0, lean = 3 }) {
+  const P = squatPose({ F: 0, lean });
+  for (const [sh, el, wr, flex] of [[11, 13, 15, flexL], [12, 14, 16, flexR]]) {
+    const u = upper * Math.min(1, flex / 90), a = rad(u), b = rad(u + flex);
+    P[el] = add(P[sh], V(0, -0.28 * Math.cos(a), 0.28 * Math.sin(a)));
+    P[wr] = add(P[el], V(0, -0.26 * Math.cos(b), 0.26 * Math.sin(b)));
+  }
+  for (const i of [17, 18, 19, 20, 21, 22]) P[i] = undefined;
+  return fill(P);
+}
+
 // последовательность кадров: phases = [[сек, (u)=>поза], ...]
 function sequence(phases, yaw, { fps = 30, seed = 11, dropout = 0, aspect = 16 / 9, noise = 1 } = {}) {
   const r = rng(seed), out = [];
@@ -163,4 +175,4 @@ function sequence(phases, yaw, { fps = 30, seed = 11, dropout = 0, aspect = 16 /
 }
 
 const wave = (u) => (1 - Math.cos(2 * Math.PI * u)) / 2;
-module.exports = { lungePose, squatPose, pushupPose, plankPose, render, sequence, wave };
+module.exports = { curlPose, lungePose, squatPose, pushupPose, plankPose, render, sequence, wave };

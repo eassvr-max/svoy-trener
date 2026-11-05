@@ -10,7 +10,7 @@ ${synth}
 window.SYN = module.exports;
 window.VOICE_PACK = ${JSON.stringify(pack)};
 window.__played = [];
-window.Audio = function (src) { this.src = src; this.play = () => { window.__played.push(decodeURIComponent(escape(atob(src.split(',')[1])))); setTimeout(() => this.onended && this.onended(), 30); return Promise.resolve(); }; this.pause = () => {}; };
+window.Audio = function (src) { this.src = src; this.play = () => { window.__played.push(decodeURIComponent(escape(atob(this.src.split(',')[1])))); setTimeout(() => this.onended && this.onended(), 30); return Promise.resolve(); }; this.pause = () => {}; };
 (() => {
   const S = window.SYN; let k = 1; const r = () => (k = (k * 16807) % 2147483647) / 2147483647;
   const plan = [{}, {}, { hipZ: 0.3 }, { drop: 0.3 }, { front: 'R' }, { front: 'R' }, { front: 'R', hipZ: 0.3 }];

@@ -169,6 +169,21 @@ const puTop = (sec = 1) => [sec, () => S.pushupPose({ elbow: 168 })];
   check('план: склонения', E.repsWord(1) === 'повторение' && E.repsWord(3) === 'повторения' && E.repsWord(12) === 'повторений' && E.repsWord(21) === 'повторение');
 }
 
+// ===== 9в. Бицепс с гантелями: пик, локоть, раскачка, поочерёдные руки; сбоку и спереди =====
+for (const yaw of [90, 0]) {
+  const stand = () => [0.8, () => S.curlPose({})];
+  const curl = (o = {}) => [2.2, (u) => { const w = S.wave(u), fx = (o.F ?? 135) * w;
+    return S.curlPose({ flexL: o.alt === 'R' ? 0 : fx, flexR: o.alt === 'L' ? 0 : fx, upper: o.upper ?? 5, lean: 3 - (o.swing ?? 0) * w }); }];
+  const seq = S.sequence([stand(), curl(), curl({ F: 85 }), curl({ upper: 50 }), curl({ swing: 18 }), curl({ alt: 'L' }), curl({ alt: 'R' }), curl(), stand()], yaw, { seed: 5 });
+  const res = E.analyze(seq.map((f) => E.makeFrame(f.t, f.lm, f.wl, f.aspect)), 'curl');
+  const v = yaw === 90 ? 'сбоку' : 'спереди';
+  check(`бицепс ${v}: 7 повторов`, res.reps === 7, faultsOf(res));
+  check(`бицепс ${v}: чистые повторы без замечаний`, clean(res, 0) && clean(res, 4) && clean(res, 5) && clean(res, 6), faultsOf(res));
+  check(`бицепс ${v}: не дожал / локоть / раскачка`, has(res, 1, 'cu_peak_major') && has(res, 2, 'cu_elbow') && has(res, 3, 'cu_swing'), faultsOf(res));
+  check(`бицепс ${v}: поочерёдно — рука определена`, res.repsDetail[4].leg !== res.repsDetail[5].leg, res.repsDetail.map((r) => r.leg).join(''));
+}
+check('бицепс: прогрессия по весу', /тяжелее: гантели 7 кг/.test(E.nextPlan('curl', { target: 14, setsPlanned: 3, sets: [{ done: 14 }, { done: 14 }, { done: 14 }], goodPct: 95, kg: 6 }).why));
+
 // ===== 10. Несколько людей в кадре =====
 {
   const r = S.render(S.squatPose({}), 90, { r: () => 0.5 });

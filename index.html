@@ -35,6 +35,7 @@
 
   /* ---------- карточки упражнений ---------- */
   .ex-list{display:grid;gap:12px}
+  .ex-group{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 2px -2px}
   .ex{display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
       border-radius:var(--r);padding:14px 16px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s;color:inherit}
   .ex:hover{border-color:#c9c1ae;box-shadow:0 6px 18px rgba(23,35,29,.06)}
@@ -211,6 +212,7 @@
     <div class="plan-h">План тренера на сегодня</div>
     <div class="plan-row"><span id="pl-target-l">Повторений в подходе</span><button class="pm" data-pl="target" data-d="-1">−</button><b id="pl-target">12</b><button class="pm" data-pl="target" data-d="1">+</button></div>
     <div class="plan-row"><span>Подходов</span><button class="pm" data-pl="sets" data-d="-1">−</button><b id="pl-sets">3</b><button class="pm" data-pl="sets" data-d="1">+</button></div>
+    <div class="plan-row" id="pl-kg-row" hidden><span>Вес гантели, кг</span><button class="pm" data-pl="kg" data-d="-1">−</button><b id="pl-kg">—</b><button class="pm" data-pl="kg" data-d="1">+</button></div>
     <div class="plan-row"><span>Отдых между подходами, с</span><button class="pm" data-pl="rest" data-d="-1">−</button><b id="pl-rest">60</b><button class="pm" data-pl="rest" data-d="1">+</button></div>
     <small id="pl-why"></small>
   </div>
@@ -311,10 +313,14 @@ const MODEL_URL = (k) => `https://storage.googleapis.com/mediapipe-models/pose_l
 const FIG = {
   squat: `<svg width="64" height="50" viewBox="0 0 64 50" fill="none" stroke="#1f6f4a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="27" cy="8" r="4.5" fill="#1f6f4a" stroke="none"/><path d="M27 14l-5 13h12l-2 15M22 27l-5 15M26 18l14 2"/><path d="M8 46h48" stroke-width="2" opacity=".35"/></svg>`,
   pushup: `<svg width="64" height="50" viewBox="0 0 64 50" fill="none" stroke="#1f6f4a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="20" r="4.5" fill="#1f6f4a" stroke="none"/><path d="M44 25L10 37M44 25l2 8 0 9M10 37l-2 5"/><path d="M4 46h56" stroke-width="2" opacity=".35"/></svg>`,
+  curl: `<svg width="64" height="50" viewBox="0 0 64 50" fill="none" stroke="#1f6f4a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="30" cy="7" r="4.5" fill="#1f6f4a" stroke="none"/><path d="M30 13v15M30 28l-4 14M30 28l4 14M30 16l1 9 8-6"/><path d="M36 16h7M39.5 13v6" stroke-width="3.6"/><path d="M4 46h56" stroke-width="2" opacity=".35"/></svg>`,
   lunge: `<svg width="64" height="50" viewBox="0 0 64 50" fill="none" stroke="#1f6f4a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="30" cy="7" r="4.5" fill="#1f6f4a" stroke="none"/><path d="M30 13v14M30 27l10 1 1 14M30 27l-9 8-9 7"/><path d="M4 46h56" stroke-width="2" opacity=".35"/></svg>`,
   plank: `<svg width="64" height="50" viewBox="0 0 64 50" fill="none" stroke="#1f6f4a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="51" cy="27" r="4.5" fill="#1f6f4a" stroke="none"/><path d="M45 31L10 38M45 31l-1 11h9M10 38l-2 4"/><path d="M4 46h56" stroke-width="2" opacity=".35"/></svg>`,
 };
 const EX = {
+  curl: { name: 'Бицепс с гантелями', muscles: 'Руки · зал', unit: 'reps', gym: true,
+    steps: ['Телефон <b>сбоку</b> на уровне груди, в 2–3 м — так видно, гуляет ли локоть и качается ли корпус.', 'В кадре корпус и руки целиком, лучше с ногами.', 'Можно поднимать обе гантели сразу или поочерёдно — тренер считает каждую руку.', 'Встаньте прямо, руки с гантелями опущены, дождитесь отсчёта.'],
+    checks: ['Подъём до плеча', 'Разгибание внизу', 'Локоть у корпуса', 'Раскачка корпусом', 'Темп опускания', 'Баланс левой и правой руки'] },
   squat: { name: 'Приседания', muscles: 'Ноги и ягодицы', unit: 'reps',
     steps: ['Телефон <b>сбоку</b> на уровне колен–пояса, в 2–3 м — так видны глубина, спина и пятки.', 'Или <b>спереди</b> — так видны колени и перекос таза. Лучше снять по подходу с обеих точек.', 'В кадре всё тело целиком, от головы до стоп, свет спереди или сбоку, не в спину.', 'Встаньте прямо, дождитесь отсчёта и приседайте в своём темпе.'],
     checks: ['Глубина относительно параллели', 'Корпус и голень', 'Таз раньше груди', 'Колени внутрь', 'Пятки', 'Перекос таза', 'Выпрямление', 'Темп'] },
@@ -328,9 +334,11 @@ const EX = {
     steps: ['Телефон на полу <b>сбоку</b>, в 1,5–2 м.', 'В кадре тело целиком.', 'После отсчёта примите планку на локтях или прямых руках.', 'Таймер идёт, только пока вы в положении планки.'],
     checks: ['Линия тела', 'Провис / подъём таза', 'Голова', 'Плечи над локтями', 'Усталость к концу'] },
 };
-$('ex-list').innerHTML = Object.entries(EX).map(([id, e]) => `
+const exBtn = ([id, e]) => `
   <button class="ex" data-ex="${id}"><div class="pic">${FIG[id]}</div>
-  <div><b>${e.name}</b><span>${e.muscles}</span></div><div class="arrow">›</div></button>`).join('');
+  <div><b>${e.name}</b><span>${e.muscles}</span></div><div class="arrow">›</div></button>`;
+$('ex-list').innerHTML = '<div class="ex-group">Свой вес</div>' + Object.entries(EX).filter(([, e]) => !e.gym).map(exBtn).join('')
+  + '<div class="ex-group">Зал · гантели</div>' + Object.entries(EX).filter(([, e]) => e.gym).map(exBtn).join('');
 
 // ---------- состояние ----------
 let exercise = 'squat';
@@ -361,6 +369,7 @@ function renderPlan() {
   const isT = plan.unit === 'sec';
   $('pl-target-l').textContent = isT ? 'Секунд в подходе' : 'Повторений в подходе';
   $('pl-target').textContent = plan.target; $('pl-sets').textContent = plan.sets; $('pl-rest').textContent = plan.rest;
+  $('pl-kg-row').hidden = !E.PLAN_BASE[exercise].weighted; $('pl-kg').textContent = plan.kg ? String(plan.kg).replace('.', ',') : '—';
   $('pl-why').textContent = plan.why || '';
 }
 document.addEventListener('click', (e) => {
@@ -369,6 +378,7 @@ document.addEventListener('click', (e) => {
   if (k === 'target') plan.target = Math.max(base.min, Math.min(base.max, plan.target + d * (plan.unit === 'sec' ? 5 : 1)));
   if (k === 'sets') plan.sets = Math.max(1, Math.min(6, plan.sets + d));
   if (k === 'rest') plan.rest = Math.max(15, Math.min(180, plan.rest + d * 15));
+  if (k === 'kg') { if (!plan.kg) plan.kg = 5; else { const st = plan.kg + (d < 0 ? -0.01 : 0) >= 10 ? 1 : 0.5; plan.kg = Math.max(0.5, Math.min(60, +(plan.kg + d * st).toFixed(1))); } }
   plan.why = 'Свой план — тренер будет держать именно его.';
   renderPlan();
 });
@@ -431,7 +441,7 @@ function setupError(msg) { const el = $('setup-err'); el.innerHTML = msg; el.hid
 // ---------- голос ----------
 // 1) Если вшит голосовой пакет (записанные нейросетевым голосом фразы) — играем записи.
 // 2) Иначе — лучший голос браузера: нейросетевые («Natural/Online» в Edge) ставим первыми.
-const VOICE_PACK = window.VOICE_PACK || null; // { "фраза": "data:audio/...;base64,..." }
+let VOICE_PACK = window.VOICE_PACK || null; // { "фраза": "data:audio/...;base64,..." } — вшит в страницу или лежит рядом в voice-pack.json
 const voice = { last: {}, ru: null, list: [], audio: null, queue: [] };
 const vrank = (v) => (/natural|neural|online/i.test(v.name) ? 10 : 0) + (/Google/i.test(v.name) ? 4 : 0) + (/Svetlana|Dmitry|Milena|Yuri|Alena|Filipp/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
 function listVoices() {
@@ -450,6 +460,9 @@ function listVoices() {
 }
 function applyVoice() { const v = $('voice-sel').value; voice.ru = voice.list.find((x) => x.name === v) || null; voice.usePack = v === 'pack'; try { localStorage.setItem('st_voice', v); } catch {} }
 if ('speechSynthesis' in window) { listVoices(); speechSynthesis.onvoiceschanged = listVoices; } else listVoices();
+// записанный голос тренера (собирается на GitHub при публикации) — подгружаем отдельно, чтобы страница открывалась быстро
+if (!VOICE_PACK && location.protocol.startsWith('http')) fetch('voice-pack.json', { cache: 'force-cache' })
+  .then((r) => (r.ok ? r.json() : null)).then((p) => { if (p && Object.keys(p).length) { VOICE_PACK = p; listVoices(); } }).catch(() => {});
 $('voice-sel').addEventListener('change', applyVoice);
 $('voice-test').addEventListener('click', () => speak('Привет! Я твой тренер. Начинаем — ниже, до параллели! Вот так, отлично!', true));
 // разбиваем фразу на кусочки, которые есть в пакете («Хорошо, а теперь чуть глубже!» → «Хорошо» + «а теперь чуть глубже»)
@@ -461,10 +474,12 @@ function packClips(text) {
   for (const p of parts) { const k = VOICE_PACK[p] || VOICE_PACK[p.replace(/[!.,]+$/, '')] || VOICE_PACK[p.replace(/[!.,]+$/, '') + '!']; if (!k) return null; clips.push(k); }
   return clips;
 }
+// один и тот же аудиоэлемент на все фразы: на айфоне звук разрешается только элементу, запущенному нажатием кнопки
 function playClips(clips) {
-  if (voice.audio) { voice.audio.pause(); voice.audio = null; }
+  const a = voice.el || (voice.el = new Audio());
+  a.pause();
   voice.queue = clips.slice();
-  const next = () => { const src = voice.queue.shift(); if (!src) return; const a = new Audio(src); voice.audio = a; a.onended = next; a.play().catch(() => {}); };
+  const next = () => { const src = voice.queue.shift(); if (!src) return; a.onended = next; a.src = src; a.play().catch(() => {}); };
   next();
 }
 function speak(text, force = false) {
@@ -475,7 +490,7 @@ function speak(text, force = false) {
   const clips = voice.usePack ? packClips(text) : null;
   if (clips) { if ('speechSynthesis' in window) speechSynthesis.cancel(); playClips(clips); return; }
   if (!('speechSynthesis' in window)) return;
-  if (voice.audio) { voice.audio.pause(); voice.audio = null; }
+  if (voice.el) voice.el.pause();
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ru-RU'; u.rate = /natural|online|neural/i.test(voice.ru?.name || '') ? 1.0 : 1.05; if (voice.ru) u.voice = voice.ru;
@@ -488,6 +503,7 @@ const GROUP_JOINTS = {
   depth: [23,24,25,26,27,28], trunk: [11,12,23,24], knees: [23,24,25,26,27,28], heels: [27,28,29,30,31,32],
   balance: [23,24], lockout: [23,24,25,26,13,14,15,16], tempo: [], line: [11,12,23,24,27,28], elbows: [11,12,13,14,15,16],
   head: [7,8,11,12], shoulders: [11,12,13,14], knee: [25,26,27,28,31,32], stance: [27,28,31,32],
+  peak: [11,12,13,14,15,16], extend: [13,14,15,16], elbow: [11,12,13,14], swing: [11,12,23,24],
 };
 function badJoints(codes) {
   const s = new Set();
@@ -529,6 +545,7 @@ function angleLabel(f, lm) {
   const N = E.SIDES[f.near];
   if (exercise === 'squat') return { joint: N.kn, text: Math.round(180 - f.kneeFlex) + '°' };
   if (exercise === 'pushup') return { joint: N.el, text: Math.round(f.elbow) + '°' };
+  if (exercise === 'curl' && f.arm) { const sd = f.curlSide || f.near; return { joint: E.SIDES[sd].el, text: Math.round(f.arm[sd].elbow) + '° · плечо ' + Math.round(f.arm[sd].upper) + '°' }; }
   if (exercise === 'lunge' && f.leg) {
     const fr = f.leg.L.thighV >= f.leg.R.thighV ? 'L' : 'R';
     return { joint: E.SIDES[fr].kn, text: Math.round(180 - f.leg[fr].flex) + '° · голень ' + Math.round(f.leg[fr].shinFwd) + '°' };
@@ -842,7 +859,7 @@ function finishLive() {
     }
   }
   res.plan = session.plan; res.sets = session.setsLog;
-  if (session.setsLog.length) saveHist(exercise, { target: session.plan.target, setsPlanned: session.plan.sets, sets: session.setsLog,
+  if (session.setsLog.length) saveHist(exercise, { target: session.plan.target, setsPlanned: session.plan.sets, sets: session.setsLog, kg: session.plan.kg,
     goodPct: res.exercise === 'plank' ? res.goodPct : res.reps ? Math.round(100 * res.goodReps / res.reps) : 0, date: new Date().toISOString() });
   complete(res, snaps);
 }
@@ -900,7 +917,7 @@ function renderReport(r, snaps) {
   $('stats').innerHTML = stats.map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join('');
 
   const sl = $('sets-line'); sl.hidden = !r.sets?.length;
-  if (r.sets?.length) sl.innerHTML = r.sets.map((x, i) => `<span class="${x.done < x.target ? 'short' : ''}">Подход ${i + 1}: ${isTime ? fmt(x.done) : x.done} из ${isTime ? fmt(x.target) : x.target}</span>`).join('');
+  if (r.sets?.length) sl.innerHTML = r.sets.map((x, i) => `<span class="${x.done < x.target ? 'short' : ''}">Подход ${i + 1}: ${isTime ? fmt(x.done) : x.done} из ${isTime ? fmt(x.target) : x.target}</span>`).join('') + (r.plan?.kg ? `<span>Гантели ${String(r.plan.kg).replace('.', ',')} кг</span>` : '');
   $('coach').innerHTML = `<div class="coach-h">Тренер</div><p>${r.coachText}</p>`;
 
   $('snaps-block').hidden = !snaps.length;

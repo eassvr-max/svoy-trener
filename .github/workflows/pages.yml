@@ -18,6 +18,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # ключ Yandex SpeechKit — в Settings → Secrets and variables → Actions; без него тренер говорит голосом браузера
+      TTS_KEY: ${{ secrets.YANDEX_TTS_KEY }}
+      TTS_VOICE: ${{ vars.TTS_VOICE || 'alena' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -25,11 +29,25 @@ jobs:
           node-version: '22'
       - name: Проверки движка
         run: node test_engine.js
+      - name: Записанные фразы с прошлых публикаций
+        if: env.TTS_KEY != ''
+        uses: actions/cache@v4
+        with:
+          path: voice-cache.json
+          key: voice-${{ env.TTS_VOICE }}-${{ github.run_id }}
+          restore-keys: voice-${{ env.TTS_VOICE }}-
+      - name: Голос тренера (озвучиваются только новые фразы)
+        if: env.TTS_KEY != ''
+        run: |
+          pip install -q requests
+          node -e "require('fs').writeFileSync('tools/phrases.json', JSON.stringify(require('./engine.js').allPhrases(), null, 1))"
+          python tools/make_voice_pack.py --engine yandex --voice "$TTS_VOICE" --emotion good --phrases tools/phrases.json --out voice-cache.json --html none
       - name: Сборка
         run: |
           node build.js
           mkdir -p _site
           cp dist/svoy-trener.html _site/index.html
+          [ -f voice-cache.json ] && cp voice-cache.json _site/voice-pack.json || true
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
