@@ -1,0 +1,14 @@
+const R = require('./qevd_res2.json').filter((r) => r.det >= 60 && r.reps);
+const has = (r, ...ls) => r.labels.some((l) => ls.includes(l));
+const cv = (codes) => (p) => { for (const c of codes) if (p.crit[c] != null) return p.crit[c]; return null; };
+const tab = (name, pos, neg, f, ths) => { const P = pos.flatMap((r) => r.rp.map(f)).filter((x) => x != null), N = neg.flatMap((r) => r.rp.map(f)).filter((x) => x != null);
+  console.log(name, 'повт +', P.length, '−', N.length, ths.map((t) => `${t}: ${(100 * P.filter((x) => x > t).length / P.length).toFixed(0)}/${(100 * N.filter((x) => x > t).length / N.length).toFixed(0)}`).join('  ')); };
+const PU = R.filter((r) => r.sub === 'pushups' && r.view === 'front');
+tab('отжим. локоть спереди', PU.filter((r) => has(r, 'shallow', 'insufficient')), PU.filter((r) => has(r, '90 degrees', 'deep') && !has(r, 'shallow', 'insufficient')), cv(['depth', 'pu_depth_minor', 'pu_depth_major']), [110, 115, 120, 125, 130, 135, 140]);
+const LU = R.filter((r) => r.ex === 'lunge');
+const lc = LU.filter((r) => has(r, 'no obvious issue'));
+tab('выпад колено внутрь (no issue)', lc, lc, cv(['knees', 'lu_valgus']), [0.06, 0.08, 0.1, 0.12, 0.15, 0.2]);
+tab('выпад глубина insufficient vs no issue', LU.filter((r) => has(r, 'insufficient')), lc, cv(['depth', 'lu_depth_minor', 'lu_depth_major']), [100, 105, 110, 115, 120, 125, 130]);
+tab('выпад задняя нога kneeMax', LU.filter((r) => has(r, 'not bending back leg')), lc, (p) => p.kneeMax, [120, 130, 140, 150, 160]);
+tab('выпад наклон leanB', LU.filter((r) => has(r, 'leaning forward')), lc, (p) => p.leanB, [12, 15, 18, 20, 25, 30, 35]);
+const v = lc.flatMap((r) => r.rp.map(cv(['knees', 'lu_valgus']))).filter((x) => x != null).sort((a, b) => a - b); console.log('valgus no issue квантили', [0.1, 0.5, 0.9, 0.95].map((p) => v[Math.floor(p * v.length)].toFixed(3)).join(' '));

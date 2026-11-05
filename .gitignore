@@ -1,0 +1,5 @@
+dist/
+_site/
+shots/
+voice-pack.json
+node_modules/
